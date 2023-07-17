@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use std::cell::RefCell;
 
-use gtk::prelude::*;
 use gtk::glib::{self, Properties};
+use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 
 #[derive(Properties, Default)]
@@ -35,11 +35,6 @@ impl ObjectImpl for CacheCacheWindow {
 
     fn constructed(&self) {
         self.parent_constructed();
-
-        let obj = self.obj();
-        let empty_path_buf = PathBuf::new();
-        dbg!(&empty_path_buf);
-        obj.set_path_buf(empty_path_buf);
     }
 }
 
@@ -47,4 +42,4 @@ impl WidgetImpl for CacheCacheWindow {}
 
 impl WindowImpl for CacheCacheWindow {}
 
-impl ApplicationWindowImpl for CacheCacheWindow {} 
+impl ApplicationWindowImpl for CacheCacheWindow {}

@@ -5,15 +5,18 @@ use std::{error::Error, thread, env};
 use gtk::gio::{ApplicationFlags, ApplicationCommandLine, Cancellable};
 use gtk::glib::{MainContext, Priority};
 use gtk::pango::EllipsizeMode;
-use gtk::{prelude::*, ScrolledWindow, PolicyType, Button, Orientation, Label, Align, Separator, FileDialog, Window, DialogError, Spinner};
-use gtk::{glib};
+use gtk::{prelude::*, ScrolledWindow, PolicyType, Button, Orientation, Label, Align, Separator, FileDialog, Window, DialogError, Spinner, Paned};
+use gtk::glib;
 use sim::{CacheEntry, CacheStats, CacheDesc};
 use glib::clone;
+use sim_input::SimInput;
 use window::CacheCacheWindow;
 
 use libadwaita::{Application, HeaderBar};
 mod sim;
 mod window;
+
+mod sim_input;
 
 const APP_ID: &str = "com.github.maxi0604.CacheCache";
 type SimResult = (CacheLineVec, CacheDesc, Vec<u64>, CacheStats);
@@ -78,31 +81,53 @@ fn build_ui(app: &Application, command_line: &ApplicationCommandLine) -> i32 {
         window.set_path_buf(some_path_buf);
     }
 
+    let paned = Paned::builder()
+        .orientation(Orientation::Horizontal)
+        .width_request(200)
+        .height_request(-1)
+        .build();
+
     let scrolled_window = ScrolledWindow::builder()
         .hscrollbar_policy(PolicyType::Automatic)
         .min_content_width(150)
         .vexpand(true)
         .build();
 
+    let input = SimInput::new();
+    input.use_window(Some(&window));
+
+    paned.set_start_child(Some(&scrolled_window));
+    paned.set_end_child(Some(&input));
+
     let separator_top = Separator::new(Orientation::Horizontal);
     let separator_bottom = Separator::new(Orientation::Horizontal);
     separator_bottom.set_visible(false);
 
     let file_display_label = Label::builder()
-        .label("No File Selected")
         .build();
+
+    match window.path_buf().canonicalize() {
+        Ok(result) => {
+            file_display_label.set_label(format!("{}", result.display()).as_str());
+        }
+        Err(_) => {
+            file_display_label.set_label("No File Selected");
+        }
+    }
+
     let file_display_spinner = Spinner::builder()
         .halign(Align::End)
         .build();
 
     window.bind_property("path-buf", &file_display_label, "label")
         .transform_to(|_, path_buf: PathBuf| {
-            if let Some(file_str) = path_buf.to_str().to_owned() {
-                Some(file_str.to_value())
-            } else if path_buf.is_file() {
-                Some("Could not parse file name to string".to_value())
-            } else {
-                Some("No File Selected".to_value())
+            match path_buf.canonicalize() {
+                Ok(result) => {
+                    Some(format!("{}", result.display()))
+                }
+                Err(_) => {
+                    Some("No File Selected".to_string())
+                }
             }
         })
         .build();
@@ -238,7 +263,7 @@ fn build_ui(app: &Application, command_line: &ApplicationCommandLine) -> i32 {
 
     container_box.append(&file_display);
     container_box.append(&separator_top);
-    container_box.append(&scrolled_window);
+    container_box.append(&paned);
     container_box.append(&separator_bottom);
     container_box.append(&stats_showcase);
 
@@ -285,4 +310,12 @@ fn run_sim(path: &PathBuf) -> Result<SimResult, Box<dyn Error>> {
     let (lines, stats) = sim::simulate(&cache, &addrs);
 
     Ok((lines, cache, addrs, stats))
+}
+
+pub (crate) fn extract_filename(window: &CacheCacheWindow) -> String {
+    if let Some(filename) = window.path_buf().file_name() {
+                let name = filename.to_string_lossy();
+                return name.into_owned();
+            }
+    return "".to_string();
 }
